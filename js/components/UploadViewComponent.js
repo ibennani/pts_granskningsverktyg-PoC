@@ -1,5 +1,9 @@
 // js/components/UploadViewComponent.js
 
+// NYTT: Importera de nya logikmodulerna
+import { RuleFileLoader } from '../logic/rule_file_loader.js';
+import { SavedAuditLoader } from '../logic/saved_audit_loader.js';
+
 const UploadViewComponent_internal = (function () {
     'use-strict';
 
@@ -13,12 +17,22 @@ const UploadViewComponent_internal = (function () {
     let load_ongoing_audit_btn;
     let start_new_audit_btn;
 
+    // Dessa kommer fortfarande att behövas för att skickas vidare till logikmodulerna
     let local_getState;
     let local_dispatch;
-    let local_StoreActionTypes; 
+    let local_StoreActionTypes;
 
-    function get_t_func() {
-        // ... (som tidigare) ...
+    // Beroenden som används direkt av denna komponent
+    let Translation_t_local; // Omdöpt för att undvika konflikt med tFunction i logikmodulerna
+    let Helpers_create_element_local;
+    let Helpers_get_icon_svg_local;
+    let Helpers_load_css_local;
+    let NotificationComponent_show_global_message_local;
+    let NotificationComponent_get_global_message_element_reference_local;
+    let ValidationLogic_local; // Referens till hela ValidationLogic-objektet
+
+    function get_t_func_local_scope() {
+        if (Translation_t_local) return Translation_t_local;
         return (typeof window.Translation !== 'undefined' && typeof window.Translation.t === 'function')
             ? window.Translation.t
             : (key, replacements) => {
@@ -32,183 +46,148 @@ const UploadViewComponent_internal = (function () {
             };
     }
 
+    // NYTT: Modifierad funktion för att hantera val av regelfil
     function handle_rule_file_select(event) {
-        const t = get_t_func();
-        // console.log("[UploadViewComponent] handle_rule_file_select triggered.");
+        const t = get_t_func_local_scope();
         const file = event.target.files[0];
         if (file) {
-            if (file.type !== "application/json") {
-                if (window.NotificationComponent) NotificationComponent.show_global_message(t('error_file_must_be_json'), 'error');
-                if (rule_file_input_element) rule_file_input_element.value = '';
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                try {
-                    const json_content = JSON.parse(e.target.result);
-                    const validation_result = window.ValidationLogic.validate_rule_file_json(json_content);
-
-                    if (validation_result.isValid) {
-                        if (window.NotificationComponent) NotificationComponent.show_global_message(validation_result.message, 'success');
-                        
-                        console.log("[UploadViewComponent] Dispatching INITIALIZE_NEW_AUDIT with ruleFileContent.");
-                        local_dispatch({
-                            type: local_StoreActionTypes.INITIALIZE_NEW_AUDIT, // Använd den lokala referensen
-                            payload: { ruleFileContent: json_content }
-                        });
-                        router_ref('metadata');
-                    } else {
-                        if (window.NotificationComponent) NotificationComponent.show_global_message(validation_result.message, 'error');
-                        if (rule_file_input_element) rule_file_input_element.value = '';
-                    }
-                } catch (error) {
-                    console.error("Fel vid parsning av JSON från regelfil:", error);
-                    if (window.NotificationComponent) NotificationComponent.show_global_message(t('rule_file_invalid_json'), 'error');
+            RuleFileLoader.loadAndProcessRuleFile(
+                file,
+                ValidationLogic_local, // Skicka med ValidationLogic-objektet
+                local_dispatch,
+                local_StoreActionTypes.INITIALIZE_NEW_AUDIT,
+                t, // Skicka med översättningsfunktionen
+                NotificationComponent_show_global_message_local, // Skicka med notisfunktionen
+                () => { // successCallback
+                    // NotificationComponent_show_global_message_local(t('rule_file_loaded_successfully'), 'success'); // Detta sköts nu inuti RuleFileLoader
+                    router_ref('metadata');
+                },
+                (errorMessage) => { // errorCallback
+                    NotificationComponent_show_global_message_local(errorMessage, 'error');
                     if (rule_file_input_element) rule_file_input_element.value = '';
                 }
-            };
-            reader.onerror = function() {
-                if (window.NotificationComponent) NotificationComponent.show_global_message(t('error_file_read_error'), 'error');
-                if (rule_file_input_element) rule_file_input_element.value = '';
-            };
-            reader.readAsText(file);
+            );
         }
-        if(rule_file_input_element) rule_file_input_element.value = '';
+        // Nollställ alltid input för att tillåta val av samma fil igen
+        if (rule_file_input_element) rule_file_input_element.value = '';
     }
 
+    // NYTT: Modifierad funktion för att hantera val av sparad granskningsfil
     function handle_saved_audit_file_select(event) {
-        const t = get_t_func();
-        // console.log("[UploadViewComponent] handle_saved_audit_file_select triggered.");
+        const t = get_t_func_local_scope();
         const file = event.target.files[0];
         if (file) {
-            if (file.type !== "application/json") {
-                if (window.NotificationComponent) NotificationComponent.show_global_message(t('error_file_must_be_json'), 'error');
-                if (saved_audit_input_element) saved_audit_input_element.value = '';
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                try {
-                    const file_content_object = JSON.parse(e.target.result);
-                    const validation_result = window.ValidationLogic.validate_saved_audit_file(file_content_object);
-
-                    if (validation_result.isValid) {
-                        const current_app_state_version = local_getState().saveFileVersion;
-                        if (file_content_object.saveFileVersion > current_app_state_version) {
-                            console.warn(`[UploadViewComponent] Sparfilens version (${file_content_object.saveFileVersion}) är nyare än applikationens state-version (${current_app_state_version}).`);
-                            if (window.NotificationComponent) {
-                                NotificationComponent.show_global_message(
-                                    t('warning_save_file_newer_version', {
-                                        fileVersionInFile: file_content_object.saveFileVersion,
-                                        appVersion: current_app_state_version
-                                    }),
-                                    'warning', 8000);
-                            }
-                        }
-                        console.log("[UploadViewComponent] Dispatching LOAD_AUDIT_FROM_FILE.");
-                        local_dispatch({
-                            type: local_StoreActionTypes.LOAD_AUDIT_FROM_FILE, // Använd den lokala referensen
-                            payload: file_content_object
-                        });
-                        if (window.NotificationComponent) NotificationComponent.show_global_message(t('saved_audit_loaded_successfully'), 'success');
-                        router_ref('audit_overview');
-
-                    } else {
-                        if (window.NotificationComponent) NotificationComponent.show_global_message(validation_result.message, 'error');
-                    }
-                } catch (error) {
-                    console.error("Fel vid parsning av JSON från sparad granskningsfil:", error);
-                    if (window.NotificationComponent) NotificationComponent.show_global_message(t('error_invalid_saved_audit_file'), 'error');
+            SavedAuditLoader.loadAndProcessSavedAudit(
+                file,
+                ValidationLogic_local, // Skicka med ValidationLogic-objektet
+                local_dispatch,
+                local_StoreActionTypes.LOAD_AUDIT_FROM_FILE,
+                local_getState, // Skicka med getState för att hämta app-version
+                t, // Skicka med översättningsfunktionen
+                NotificationComponent_show_global_message_local, // Skicka med notisfunktionen
+                () => { // successCallback
+                    // NotificationComponent_show_global_message_local(t('saved_audit_loaded_successfully'), 'success'); // Detta sköts nu inuti SavedAuditLoader
+                    router_ref('audit_overview');
+                },
+                (errorMessage) => { // errorCallback
+                    NotificationComponent_show_global_message_local(errorMessage, 'error');
+                    if (saved_audit_input_element) saved_audit_input_element.value = '';
                 }
-            };
-            reader.onerror = function() {
-                if (window.NotificationComponent) NotificationComponent.show_global_message(t('error_file_read_error'), 'error');
-            };
-            reader.readAsText(file);
+            );
         }
-        if(saved_audit_input_element) saved_audit_input_element.value = '';
+        // Nollställ alltid input
+        if (saved_audit_input_element) saved_audit_input_element.value = '';
     }
 
-    async function init(_app_container, _router, _params, _getState, _dispatch, _StoreActionTypes) { // Lade till _StoreActionTypes
+    async function init(_app_container, _router, _params, _getState, _dispatch, _StoreActionTypes) {
         app_container_ref = _app_container;
         router_ref = _router;
-        
+
         local_getState = _getState;
         local_dispatch = _dispatch;
-        local_StoreActionTypes = _StoreActionTypes; // Spara den medskickade referensen
+        local_StoreActionTypes = _StoreActionTypes;
+
+        // Tilldela lokala referenser till globala funktioner/moduler
+        if (window.Translation && typeof window.Translation.t === 'function') Translation_t_local = window.Translation.t;
+        if (window.Helpers) {
+            Helpers_create_element_local = window.Helpers.create_element;
+            Helpers_get_icon_svg_local = window.Helpers.get_icon_svg;
+            Helpers_load_css_local = window.Helpers.load_css;
+        }
+        if (window.NotificationComponent) {
+            NotificationComponent_show_global_message_local = window.NotificationComponent.show_global_message;
+            NotificationComponent_get_global_message_element_reference_local = window.NotificationComponent.get_global_message_element_reference;
+        }
+        if (window.ValidationLogic) ValidationLogic_local = window.ValidationLogic;
+
 
         if (!local_StoreActionTypes) {
             console.error("[UploadViewComponent] CRITICAL: StoreActionTypes was not passed to init or is undefined.");
-            // Fallback för att undvika total krasch, men detta indikerar ett problem i main.js
             local_StoreActionTypes = {
-                INITIALIZE_NEW_AUDIT: 'INITIALIZE_NEW_AUDIT_ERROR',
-                LOAD_AUDIT_FROM_FILE: 'LOAD_AUDIT_FROM_FILE_ERROR'
+                INITIALIZE_NEW_AUDIT: 'INITIALIZE_NEW_AUDIT_ERROR_FALLBACK',
+                LOAD_AUDIT_FROM_FILE: 'LOAD_AUDIT_FROM_FILE_ERROR_FALLBACK'
             };
         }
+        if(!ValidationLogic_local) console.error("[UploadViewComponent] CRITICAL: ValidationLogic_local is not set!");
 
-        if (window.NotificationComponent && typeof window.NotificationComponent.get_global_message_element_reference === 'function') {
-            global_message_element_ref = NotificationComponent.get_global_message_element_reference();
-        } else {
-            console.error("[UploadViewComponent] NotificationComponent.get_global_message_element_reference not available!");
+
+        if (NotificationComponent_get_global_message_element_reference_local) {
+            global_message_element_ref = NotificationComponent_get_global_message_element_reference_local();
         }
-        try {
-            if (window.Helpers && typeof window.Helpers.load_css === 'function') {
+
+        if (Helpers_load_css_local) {
+            try {
                 const link_tag = document.querySelector(`link[href="${CSS_PATH}"]`);
                 if (!link_tag) {
-                    await window.Helpers.load_css(CSS_PATH);
+                    await Helpers_load_css_local(CSS_PATH);
                 }
-            } else {
-                console.warn("[UploadViewComponent] Helpers.load_css not available.");
+            } catch (error) {
+                console.warn(`Failed to load CSS for UploadViewComponent: ${CSS_PATH}`, error);
             }
-        } catch (error) {
-            console.warn(`Failed to load CSS for UploadViewComponent: ${CSS_PATH}`, error);
         }
-        // console.log("[UploadViewComponent] Init complete. getState, dispatch, and StoreActionTypes should be set.");
     }
 
     function render() {
-        // console.log("[UploadViewComponent] Rendering. local_getState:", typeof local_getState, "local_dispatch:", typeof local_dispatch, "local_StoreActionTypes:", typeof local_StoreActionTypes);
-        
-        if (!app_container_ref || !window.Helpers || !window.Helpers.create_element) {
-            console.error("[UploadViewComponent] app_container_ref or Helpers.create_element is MISSING in render!");
+        if (!app_container_ref || !Helpers_create_element_local) {
+            console.error("[UploadViewComponent] app_container_ref or Helpers_create_element_local is MISSING in render!");
             if (app_container_ref) app_container_ref.innerHTML = "<p>Error rendering Upload View.</p>";
             return;
         }
         app_container_ref.innerHTML = '';
-        const t = get_t_func();
+        const t = get_t_func_local_scope();
 
         if (global_message_element_ref) {
             app_container_ref.appendChild(global_message_element_ref);
         }
 
-        const title = window.Helpers.create_element('h1', { text_content: t('app_title') });
-        const intro_text = window.Helpers.create_element('p', { text_content: t('upload_view_intro') });
+        const title = Helpers_create_element_local('h1', { text_content: t('app_title') });
+        const intro_text = Helpers_create_element_local('p', { text_content: t('upload_view_intro') });
 
-        load_ongoing_audit_btn = window.Helpers.create_element('button', { /* ... som tidigare ... */ });
-        load_ongoing_audit_btn.id = 'load-ongoing-audit-btn';
-        load_ongoing_audit_btn.className = 'button button-secondary';
-        load_ongoing_audit_btn.innerHTML = `<span>${t('upload_ongoing_audit')}</span>` + (window.Helpers.get_icon_svg ? window.Helpers.get_icon_svg('upload_file', ['currentColor'], 18) : '');
+        load_ongoing_audit_btn = Helpers_create_element_local('button', {
+            id: 'load-ongoing-audit-btn',
+            class_name: 'button button-secondary',
+            html_content: `<span>${t('upload_ongoing_audit')}</span>` + (Helpers_get_icon_svg_local ? Helpers_get_icon_svg_local('upload_file', ['currentColor'], 18) : '')
+        });
 
+        start_new_audit_btn = Helpers_create_element_local('button', {
+            id: 'start-new-audit-btn',
+            class_name: 'button button-primary',
+            html_content: `<span>${t('start_new_audit')}</span>` + (Helpers_get_icon_svg_local ? Helpers_get_icon_svg_local('upload_file', ['currentColor'], 18) : '')
+        });
 
-        start_new_audit_btn = window.Helpers.create_element('button', { /* ... som tidigare ... */ });
-        start_new_audit_btn.id = 'start-new-audit-btn';
-        start_new_audit_btn.className = 'button button-primary';
-        start_new_audit_btn.innerHTML = `<span>${t('start_new_audit')}</span>` + (window.Helpers.get_icon_svg ? window.Helpers.get_icon_svg('upload_file', ['currentColor'], 18) : '');
-
-
-        const button_group = window.Helpers.create_element('div', { class_name: 'button-group' });
+        const button_group = Helpers_create_element_local('div', { class_name: 'button-group' });
         button_group.appendChild(load_ongoing_audit_btn);
         button_group.appendChild(start_new_audit_btn);
 
-        rule_file_input_element = window.Helpers.create_element('input', { /* ... som tidigare ... */ });
-        rule_file_input_element.id = 'rule-file-input';
-        Object.assign(rule_file_input_element, {type: 'file', accept: '.json', style: 'display: none;', 'aria-hidden': 'true'});
+        rule_file_input_element = Helpers_create_element_local('input', {
+            id: 'rule-file-input',
+            attributes: {type: 'file', accept: '.json', style: 'display: none;', 'aria-hidden': 'true'}
+        });
 
-
-        saved_audit_input_element = window.Helpers.create_element('input', { /* ... som tidigare ... */ });
-        saved_audit_input_element.id = 'saved-audit-input';
-        Object.assign(saved_audit_input_element, {type: 'file', accept: '.json', style: 'display: none;', 'aria-hidden': 'true'});
-
+        saved_audit_input_element = Helpers_create_element_local('input', {
+            id: 'saved-audit-input',
+            attributes: {type: 'file', accept: '.json', style: 'display: none;', 'aria-hidden': 'true'}
+        });
 
         app_container_ref.appendChild(title);
         app_container_ref.appendChild(intro_text);
@@ -218,21 +197,33 @@ const UploadViewComponent_internal = (function () {
 
         start_new_audit_btn.addEventListener('click', () => { if(rule_file_input_element) rule_file_input_element.click(); });
         if(rule_file_input_element) rule_file_input_element.addEventListener('change', handle_rule_file_select);
+
         load_ongoing_audit_btn.addEventListener('click', () => { if(saved_audit_input_element) saved_audit_input_element.click(); });
         if(saved_audit_input_element) saved_audit_input_element.addEventListener('change', handle_saved_audit_file_select);
     }
 
     function destroy() {
-        // ... (som tidigare) ...
         if (rule_file_input_element) rule_file_input_element.removeEventListener('change', handle_rule_file_select);
         if (saved_audit_input_element) saved_audit_input_element.removeEventListener('change', handle_saved_audit_file_select);
+        
+        // Nollställ referenser till DOM-element och callbacks om de inte behövs längre
         rule_file_input_element = null;
         saved_audit_input_element = null;
         load_ongoing_audit_btn = null;
         start_new_audit_btn = null;
-        local_getState = null; 
+        app_container_ref = null;
+        router_ref = null;
+        global_message_element_ref = null;
+        local_getState = null;
         local_dispatch = null;
         local_StoreActionTypes = null;
+        Translation_t_local = null;
+        Helpers_create_element_local = null;
+        Helpers_get_icon_svg_local = null;
+        Helpers_load_css_local = null;
+        NotificationComponent_show_global_message_local = null;
+        NotificationComponent_get_global_message_element_reference_local = null;
+        ValidationLogic_local = null;
     }
 
     return {
