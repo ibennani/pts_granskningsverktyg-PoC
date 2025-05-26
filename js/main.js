@@ -4,14 +4,24 @@
 import { UploadViewComponent } from './components/UploadViewComponent.js';
 import { MetadataViewComponent } from './components/MetadataViewComponent.js';
 import { SampleManagementViewComponent } from './components/SampleManagementViewComponent.js';
-import { AuditOverviewComponent } from './components/AuditOverviewComponent.js'; // Relevant nu
-import { RequirementListComponent } from './components/RequirementListComponent.js'; // Relevant nu
-import { RequirementAuditComponent } from './components/RequirementAuditComponent.js'; // Relevant nu
+import { AuditOverviewComponent } from './components/AuditOverviewComponent.js';
+import { RequirementListComponent } from './components/RequirementListComponent.js';
+import { RequirementAuditComponent } from './components/RequirementAuditComponent.js';
 
 // Importera från den nya storen
-import { getState, dispatch, subscribe, StoreActionTypes, StoreInitialState } from './state.js'; 
+import { getState, dispatch, subscribe, StoreActionTypes, StoreInitialState } from './state.js';
 
-(function () {
+// NYTT: Importera funktioner från den refaktorerade translation_logic.js
+import {
+    t as imported_t,
+    set_language as imported_set_language,
+    get_current_language_code as imported_get_current_language_code,
+    get_supported_languages as imported_get_supported_languages,
+    ensure_initial_load as imported_ensure_initial_load
+} from './translation_logic.js';
+
+
+(function () { // Behåll IIFE för main.js för att undvika att dess interna variabler blir globala
     'use-strict';
 
     const app_container = document.getElementById('app-container');
@@ -23,57 +33,55 @@ import { getState, dispatch, subscribe, StoreActionTypes, StoreInitialState } fr
 
     let current_view_component_instance = null;
     let current_view_name_rendered = null;
-    let current_view_params_rendered_json = "{}"; 
+    let current_view_params_rendered_json = "{}";
 
     let theme_toggle_button_element = null;
     let language_selector_element = null;
     let language_label_element = null;
     let store_unsubscribe_function = null;
 
+    // NYTT: Strategi B - Gör de importerade översättningsfunktionerna tillgängliga globalt
+    // för bakåtkompatibilitet med komponenter som fortfarande använder window.Translation.
+    // Detta kan tas bort gradvis när komponenterna uppdateras.
+    window.Translation = {
+        t: imported_t,
+        set_language: imported_set_language,
+        get_current_language_code: imported_get_current_language_code,
+        get_supported_languages: imported_get_supported_languages,
+        ensure_initial_load: imported_ensure_initial_load
+        // Lägg till andra funktioner från translation_logic.js här om de används globalt
+    };
+    // Nu kan get_t_fallback och andra delar av main.js som förväntar sig window.Translation.t
+    // fortfarande fungera, men vi kommer att försöka använda de importerade direkt där det är möjligt.
+    const t = imported_t; // Använd den importerade t-funktionen direkt i main.js
 
-    function get_t_fallback() {
-        return (typeof window.Translation !== 'undefined' && typeof window.Translation.t === 'function')
-            ? window.Translation.t
-            : (key, replacements) => {
-                let str = replacements && replacements.defaultValue ? replacements.defaultValue : `**${key}**`;
-                if (replacements && !replacements.defaultValue) {
-                    for (const rKey in replacements) {
-                        str += ` (${rKey}: ${replacements[rKey]})`;
-                    }
-                }
-                return str + " (Main t not found)";
-            };
-    }
 
-
-    function update_app_chrome_texts() { /* ... som tidigare ... */ 
-        const t = get_t_fallback(); 
-        if (!window.Translation || typeof window.Translation.t !== 'function') {
-            console.warn("[Main.js] update_app_chrome_texts: Translation.t is not available.");
-            return;
+    function update_app_chrome_texts() {
+        if (!window.Helpers || typeof window.Helpers.get_icon_svg !== 'function') { // Helpers behövs för ikon i temaknapp
+             console.warn("[Main.js] update_app_chrome_texts: Helpers.get_icon_svg is not available.");
+             // Fortsätt utan att uppdatera ikonen om Helpers saknas
         }
-        document.title = t('app_title');
+        document.title = t('app_title'); // Använder nu den importerade/lokala t
         if (theme_toggle_button_element && theme_toggle_button_element.themeFunctions &&
             typeof theme_toggle_button_element.themeFunctions.updateContent === 'function') {
             const current_theme = document.documentElement.getAttribute('data-theme') || 'light';
             theme_toggle_button_element.themeFunctions.updateContent(current_theme);
         }
-        if (language_selector_element && typeof Translation.get_supported_languages === 'function' && typeof Translation.get_current_language_code === 'function') {
-            const supported_languages = Translation.get_supported_languages();
+        if (language_selector_element) {
+            const supported_languages = imported_get_supported_languages(); // Använder importerad funktion
             Array.from(language_selector_element.options).forEach(option => {
                 if (supported_languages[option.value]) {
                     option.textContent = supported_languages[option.value];
                 }
             });
-            language_selector_element.value = Translation.get_current_language_code();
+            language_selector_element.value = imported_get_current_language_code(); // Använder importerad funktion
             if(language_label_element) language_label_element.textContent = t('language_switcher_label');
         }
     }
 
-    function init_ui_controls() { /* ... som tidigare ... */ 
-        const t = get_t_fallback();
-        if (!window.Translation || typeof window.Translation.t !== 'function' || !window.Helpers || typeof window.Helpers.create_element !== 'function') {
-            console.error("[Main.js] init_ui_controls: Core dependencies (Translation or Helpers) not available!");
+    function init_ui_controls() {
+        if (!window.Helpers || typeof window.Helpers.create_element !== 'function') {
+            console.error("[Main.js] init_ui_controls: Helpers.create_element not available!");
             return;
         }
         const controls_wrapper = Helpers.create_element('div', { class_name: 'global-controls'});
@@ -81,7 +89,7 @@ import { getState, dispatch, subscribe, StoreActionTypes, StoreInitialState } fr
         const language_selector_container = Helpers.create_element('div', { class_name: 'language-selector-container' });
         language_label_element = Helpers.create_element('label', {
             attributes: {for: 'language-selector'},
-            text_content: t('language_switcher_label'),
+            text_content: t('language_switcher_label'), // Använder lokal/importerad t
             class_name: 'visually-hidden'
         });
         language_selector_container.appendChild(language_label_element);
@@ -89,42 +97,38 @@ import { getState, dispatch, subscribe, StoreActionTypes, StoreInitialState } fr
             id: 'language-selector',
             class_name: ['form-control', 'form-control-small']
         });
-        if (typeof Translation.get_supported_languages === 'function' && typeof Translation.get_current_language_code === 'function' && typeof Translation.set_language === 'function') {
-            const supported_languages = Translation.get_supported_languages();
-            for (const lang_code in supported_languages) {
-                const option = Helpers.create_element('option', { value: lang_code, text_content: supported_languages[lang_code] });
-                language_selector_element.appendChild(option);
-            }
-            language_selector_element.value = Translation.get_current_language_code();
-            language_selector_element.addEventListener('change', async (event) => {
-                if (window.NotificationComponent && typeof window.NotificationComponent.clear_global_message === 'function') NotificationComponent.clear_global_message();
-                const selected_lang_code = event.target.value;
-                await Translation.set_language(selected_lang_code);
-            });
-        } else { console.error("[Main.js] Translation module functions missing for language selector."); }
+        
+        const supported_languages = imported_get_supported_languages(); // Använder importerad
+        for (const lang_code in supported_languages) {
+            const option = Helpers.create_element('option', { value: lang_code, text_content: supported_languages[lang_code] });
+            language_selector_element.appendChild(option);
+        }
+        language_selector_element.value = imported_get_current_language_code(); // Använder importerad
+        language_selector_element.addEventListener('change', async (event) => {
+            if (window.NotificationComponent && typeof window.NotificationComponent.clear_global_message === 'function') NotificationComponent.clear_global_message();
+            const selected_lang_code = event.target.value;
+            await imported_set_language(selected_lang_code); // Använder importerad
+            // 'languageChanged'-eventet kommer fortfarande att skickas från translation_logic.js
+        });
         language_selector_container.appendChild(language_selector_element);
         controls_wrapper.appendChild(language_selector_container);
 
         theme_toggle_button_element = Helpers.create_element('button', { id: 'theme-toggle', class_name: ['button', 'button-default'] });
 
         function set_theme_button_content(theme) {
-            const t_local = get_t_fallback();
             if (!theme_toggle_button_element || !window.Helpers || !window.Helpers.get_icon_svg) return;
-            
             let icon_svg_string;
             let button_label_text;
             let icon_color_val = getComputedStyle(document.documentElement).getPropertyValue('--button-default-text').trim();
-            
             if (!icon_color_val || icon_color_val === "initial" || icon_color_val === "inherit" || icon_color_val === "") {
                 icon_color_val = (theme === 'dark') ? 'var(--text-color)' : 'var(--text-color)';
             }
-
             if (theme === 'dark') {
                 icon_svg_string = Helpers.get_icon_svg('light_mode', [icon_color_val], 18);
-                button_label_text = t_local('light_mode');
+                button_label_text = t('light_mode'); // Använder lokal/importerad t
             } else {
                 icon_svg_string = Helpers.get_icon_svg('dark_mode', [icon_color_val], 18);
-                button_label_text = t_local('dark_mode');
+                button_label_text = t('dark_mode'); // Använder lokal/importerad t
             }
             theme_toggle_button_element.innerHTML = `<span> ${button_label_text}</span>` + (icon_svg_string || '');
         }
@@ -134,34 +138,27 @@ import { getState, dispatch, subscribe, StoreActionTypes, StoreInitialState } fr
             localStorage.setItem('theme_preference', theme);
             set_theme_button_content(theme);
         }
-
         theme_toggle_button_element.themeFunctions = { updateContent: set_theme_button_content };
-
         theme_toggle_button_element.addEventListener('click', () => {
             const current_theme_val = document.documentElement.getAttribute('data-theme') || 'light';
             set_theme(current_theme_val === 'dark' ? 'light' : 'dark');
         });
         controls_wrapper.appendChild(theme_toggle_button_element);
-
         const saved_theme_val = localStorage.getItem('theme_preference');
         const initial_theme_val = saved_theme_val || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         document.documentElement.setAttribute('data-theme', initial_theme_val);
         set_theme_button_content(initial_theme_val);
-
         const existing_controls = document.body.querySelector('.global-controls');
         if (existing_controls) existing_controls.remove();
         document.body.appendChild(controls_wrapper);
     }
 
     function navigate_and_set_hash(target_view_name, target_params = {}) {
-        // console.log(`%c[Main.js] navigate_and_set_hash CALLED. Target: ${target_view_name}`, "color: green; font-weight: bold;", "Params:", target_params);
         const target_hash_part = target_params && Object.keys(target_params).length > 0 ?
             `${target_view_name}?${new URLSearchParams(target_params).toString()}` :
             target_view_name;
         const new_hash = `#${target_hash_part}`;
-
         if (window.location.hash === new_hash) {
-            // console.log(`[Main.js/navigate_and_set_hash] Hash already matches ${new_hash}. Forcing re-render.`);
             render_view(target_view_name, target_params);
         } else {
             window.location.hash = new_hash;
@@ -169,20 +166,15 @@ import { getState, dispatch, subscribe, StoreActionTypes, StoreInitialState } fr
     }
 
     async function render_view(view_name_to_render, params_to_render = {}) {
-        const t = get_t_fallback();
-        if (!window.Translation || typeof window.Translation.t !== 'function' || !window.Helpers || !window.Helpers.escape_html) {
-            console.error("[Main.js] render_view: Core dependencies missing!");
-            if(app_container) app_container.innerHTML = `<p>${t('critical_error_system_render_view_failed')}</p>`;
+        if (!window.Helpers || typeof window.Helpers.escape_html !== 'function') {
+            console.error("[Main.js] render_view: Helpers.escape_html missing!");
+            if(app_container) app_container.innerHTML = `<p>Critical system error during view render.</p>`;
             return;
         }
-        // console.log(`%c[Main.js] RENDER_VIEW for: ${view_name_to_render}`, "color: purple; font-weight: bold;", "Params:", params_to_render);
-
         current_view_name_rendered = view_name_to_render;
         current_view_params_rendered_json = JSON.stringify(params_to_render);
-
         if (!app_container) { console.error("[Main.js] App container not found in render_view!"); return; }
         app_container.innerHTML = '';
-        
         if (current_view_component_instance && typeof current_view_component_instance.destroy === 'function') {
             current_view_component_instance.destroy();
         }
@@ -203,25 +195,21 @@ import { getState, dispatch, subscribe, StoreActionTypes, StoreInitialState } fr
         }
 
         try {
-            current_view_component_instance = ComponentClass; 
-            
+            current_view_component_instance = ComponentClass;
             if (!current_view_component_instance || typeof current_view_component_instance.init !== 'function' || typeof current_view_component_instance.render !== 'function') {
                 console.error(`[Main.js] Component for view ${view_name_to_render} is UNDEFINED or not a valid component object.`);
                 app_container.innerHTML = `<p>${t("error_component_load", {viewName: Helpers.escape_html(view_name_to_render)})}</p>`;
                 return;
             }
-
-            // Se till att StoreActionTypes skickas med till ALLA komponenters init
             await current_view_component_instance.init(
-                app_container, 
-                navigate_and_set_hash, 
+                app_container,
+                navigate_and_set_hash,
                 params_to_render,
-                getState, 
+                getState,
                 dispatch,
-                StoreActionTypes 
+                StoreActionTypes
             );
             current_view_component_instance.render();
-
             if (app_container && app_container.innerHTML.trim() === '') {
                 // console.warn(`[Main.js] WARNING: app_container is EMPTY after rendering ${view_name_to_render}.`);
             }
@@ -234,8 +222,7 @@ import { getState, dispatch, subscribe, StoreActionTypes, StoreInitialState } fr
         }
     }
 
-    function handle_hash_change() { /* ... som tidigare ... */ 
-        // console.log(`%c[Main.js] HASH_CHANGE_EVENT FIRED. New hash: ${window.location.hash}`, "color: red; font-weight: bold;");
+    function handle_hash_change() {
         const hash = window.location.hash.substring(1);
         const [view_name_from_hash, ...param_pairs] = hash.split('?');
         const params = {};
@@ -244,112 +231,75 @@ import { getState, dispatch, subscribe, StoreActionTypes, StoreInitialState } fr
             const url_params = new URLSearchParams(query_string);
             for (const [key, value] of url_params) { params[key] = value; }
          }
-
         let target_view = 'upload';
         let target_params = params;
-        
         const current_global_state = getState();
-
         if (view_name_from_hash) {
             target_view = view_name_from_hash;
         } else if (current_global_state && current_global_state.ruleFileContent) {
             target_view = 'audit_overview';
             target_params = {};
         }
-
         const new_params_json = JSON.stringify(target_params);
         if (current_view_name_rendered !== target_view || current_view_params_rendered_json !== new_params_json) {
-            // console.log(`[Main.js/handle_hash_change] Hash change requires rendering new view: ${target_view}`);
             render_view(target_view, target_params);
-        } else {
-            // console.log(`[Main.js/handle_hash_change] Hash or params same as currently rendered view. No re-render from hash handler, but might be triggered by store subscription if state changed.`);
         }
     }
 
-    function on_language_changed_event() { /* ... som tidigare ... */ 
-        // console.log("[Main.js] 'languageChanged' event handler triggered.");
+    function on_language_changed_event() {
         update_app_chrome_texts();
         if (current_view_name_rendered) {
-            // console.log(`[Main.js/on_language_changed_event] Re-rendering current view: ${current_view_name_rendered} due to language change.`);
             render_view(current_view_name_rendered, JSON.parse(current_view_params_rendered_json));
-        } else {
-            // console.warn("[Main.js] current_view_name_rendered not set during language change, hash handler will manage.");
         }
     }
-    
-    function on_store_change_event(new_state) { /* ... som tidigare ... */ 
-        // console.log('[Main.js] Store subscription: State has changed. New state version (example):', new_state.saveFileVersion);
+
+    function on_store_change_event(new_state) {
         if (current_view_component_instance && typeof current_view_component_instance.render === 'function') {
-            // console.log(`[Main.js] Store changed, re-rendering view: ${current_view_name_rendered}`);
             try {
                 current_view_component_instance.render();
             } catch (e) {
                 console.error(`[Main.js] Error re-rendering ${current_view_name_rendered} on state change:`, e);
                 if (window.NotificationComponent && typeof window.NotificationComponent.show_global_message === 'function') {
-                    const t = get_t_fallback();
                     NotificationComponent.show_global_message(t('critical_error_system_render_view_failed'), 'error');
                 }
             }
-        } else {
-            // console.log('[Main.js] Store changed, but no current view instance or render method to call.');
         }
     }
 
-
-    async function init_app() { /* ... som tidigare ... */ 
-        // console.log("[Main.js] App Initializing... (inside init_app)");
-        const t_init = get_t_fallback();
-
-        if (window.Translation && typeof window.Translation.ensure_initial_load === 'function') {
-            await window.Translation.ensure_initial_load();
-            // console.log("[Main.js] Initial translations loaded.");
+    async function init_app() {
+        // Använd den importerade ensure_initial_load
+        if (typeof imported_ensure_initial_load === 'function') {
+            await imported_ensure_initial_load();
         } else {
-            console.error("[Main.js] CRITICAL: Translation module or ensure_initial_load not found!");
-            if(app_container) app_container.innerHTML = `<p>${t_init('critical_error_language_system_init_failed')}</p>`;
+            console.error("[Main.js] CRITICAL: imported_ensure_initial_load from translation_logic.js not available!");
+            if(app_container) app_container.innerHTML = `<p>${t('critical_error_language_system_init_failed')}</p>`;
             return;
         }
-
-        const { t } = Translation;
-        document.title = t('app_title');
+        document.title = t('app_title'); // Använder nu den lokala/importerade t
 
         if (window.NotificationComponent && typeof window.NotificationComponent.init === 'function') {
             await NotificationComponent.init();
-            // console.log("[Main.js] NotificationComponent initialized.");
         } else {
             console.error("[Main.js] NotificationComponent is not available or not initialized correctly.");
         }
-
         init_ui_controls();
-        // console.log("[Main.js] init_ui_controls completed.");
-
         if (store_unsubscribe_function) store_unsubscribe_function();
         store_unsubscribe_function = subscribe(on_store_change_event);
-        // console.log("[Main.js] Subscribed to store state changes.");
-
         document.addEventListener('languageChanged', on_language_changed_event);
         window.addEventListener('hashchange', handle_hash_change);
-        // console.log("[Main.js] Event listeners added.");
-
         if (window.NotificationComponent && typeof NotificationComponent.clear_global_message === 'function') {
             NotificationComponent.clear_global_message();
         }
-
-        // console.log("[Main.js] Calling initial handle_hash_change to render first view.");
         handle_hash_change();
-
         update_app_chrome_texts();
-        // console.log("[Main.js] App Initialized. (end of init_app)");
     }
 
     if (document.readyState === 'loading') {
-        // console.log("[Main.js] DOM not ready, adding DOMContentLoaded listener.");
         document.addEventListener('DOMContentLoaded', () => {
-            // console.log("[Main.js] DOMContentLoaded event fired.");
             init_app().catch(err => console.error("Error during app initialization (from DOMContentLoaded):", err));
         });
     } else {
-        // console.log("[Main.js] DOM already ready, calling init_app directly.");
         init_app().catch(err => console.error("Error during app initialization (direct call):", err));
     }
 
-})();
+})(); // IIFE för main.js avslutas
