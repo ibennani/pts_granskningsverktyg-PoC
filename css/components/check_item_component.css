@@ -1,0 +1,102 @@
+/* css/components/check_item_component.css */
+
+.check-item {
+    background-color: var(--plate-background-color);
+    padding: 1.25rem;
+    margin-bottom: 1.5rem; /* Behåll för avstånd mellan check-items */
+    border: 1px solid var(--border-color);
+    border-left: 5px solid var(--accent-color);
+    border-radius: 0 var(--border-radius) var(--border-radius) 0;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.06);
+}
+
+[data-theme="dark"] .check-item {
+    background-color: color-mix(in srgb, var(--plate-background-color) 92%, black);
+    border-left-color: color-mix(in srgb, var(--accent-color) 80%, white);
+}
+
+.check-item .check-condition-title { /* H3 för check.condition */
+    font-size: 1.15rem;
+    color: var(--text-color);
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.check-item .check-status-display { /* Visar beräknad status för en check */
+    font-size: 0.9rem;
+    font-style: italic;
+    color: var(--text-color-muted);
+    margin-bottom: 1rem;
+    padding: 0.3rem 0.6rem;
+    background-color: var(--background-color);
+    border-radius: var(--border-radius);
+    display: inline-block;
+}
+
+[data-theme="dark"] .check-item .check-status-display {
+    background-color: var(--input-background-color);
+}
+
+.check-item .pass-criteria-list {
+    list-style: none;
+    padding-left: 0;
+    margin-top: 1rem;
+}
+
+.check-item .pass-criterion-item {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--secondary-color);
+    border-radius: var(--border-radius);
+    background-color: var(--background-color);
+}
+
+[data-theme="dark"] .check-item .pass-criterion-item {
+    background-color: color-mix(in srgb, var(--background-color) 95%, black );
+    border-color: var(--border-color);
+}
+
+.check-item .pass-criterion-requirement {
+    margin-bottom: 0.75rem;
+    color: var(--text-color);
+    font-size: 1rem;
+    line-height: 1.6;
+}
+
+.check-item .pass-criterion-status { /* Visar status för ett enskilt passCriterion */
+    font-size: 0.9rem;
+    color: var(--text-color-muted);
+    margin-bottom: 0.75rem;
+    font-style: italic;
+}
+
+/* Styling för aktionsknappar inuti .check-item */
+.check-item .condition-actions,
+.check-item .pass-criterion-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.check-item .condition-actions {
+    margin-bottom: 1rem;
+}
+
+.check-item .condition-actions .button.button-small,
+.check-item .pass-criterion-actions .button.button-small {
+    transition: outline-color 0.15s ease-in-out, outline-offset 0.15s ease-in-out;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+}
+
+.check-item .condition-actions .button.button-small.active,
+.check-item .pass-criterion-actions .button.button-small.active {
+    outline-color: var(--primary-color);
+}
+
+[data-theme="dark"] .check-item .condition-actions .button.button-small.active,
+[data-theme="dark"] .check-item .pass-criterion-actions .button.button-small.active {
+    outline-color: var(--primary-color);
+}

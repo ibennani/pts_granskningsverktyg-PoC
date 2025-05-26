@@ -74,102 +74,32 @@
     /* Ärver från globalt eller tidigare komponent-CSS, kan justeras här */
 }
 
-/* Styles for Checks Section */
+/* Styles for Checks Section - Behållaren finns kvar här */
 .checks-container {
     margin-top: 2rem; /* Mer luft ovanför kontrollpunktssektionen */
 }
-.check-item {
-    background-color: var(--plate-background-color);
-    padding: 1.25rem; /* Mer padding inuti varje check-item */
-    margin-bottom: 1.5rem;
-    border: 1px solid var(--border-color);
-    border-left: 5px solid var(--accent-color); /* Tydligare accentkant */
-    border-radius: 0 var(--border-radius) var(--border-radius) 0;
-    box-shadow: 2px 2px 5px rgba(0,0,0,0.06);
-}
-[data-theme="dark"] .check-item {
-    background-color: color-mix(in srgb, var(--plate-background-color) 92%, black);
-    border-left-color: color-mix(in srgb, var(--accent-color) 80%, white);
-}
 
-.check-condition-title { /* H3 för check.condition */
-    font-size: 1.15rem; /* Något mindre än H2, men större än vanlig text */
-    color: var(--text-color);
-    margin-top: 0;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-}
-.check-status-display { /* Visar beräknad status för en check */
-    font-size: 0.9rem;
-    font-style: italic;
-    color: var(--text-color-muted);
-    margin-bottom: 1rem;
-    padding: 0.3rem 0.6rem;
-    background-color: var(--background-color);
-    border-radius: var(--border-radius);
-    display: inline-block; /* Så att bakgrunden bara täcker texten */
-}
-[data-theme="dark"] .check-status-display {
-    background-color: var(--input-background-color);
-}
+/* ---- ALL CSS NEDANFÖR DETTA FÖR .check-item OCH DESS INNEHÅLL ÄR BORTTAGEN ---- */
+/* ---- DEN HAR FLYTTATS TILL css/components/check_item_component.css         ---- */
 
-.pass-criteria-list {
-    list-style: none;
-    padding-left: 0;
-    margin-top: 1rem; /* Lite luft ovanför listan med pass criteria */
-}
-.pass-criterion-item {
-    padding: 1rem;
-    margin-bottom: 1rem;
-    border: 1px solid var(--secondary-color);
-    border-radius: var(--border-radius);
-    background-color: var(--background-color);
-}
-[data-theme="dark"] .pass-criterion-item {
-    background-color: color-mix(in srgb, var(--background-color) 95%, black ); /* Lite mörkare än body för kontrast */
-    border-color: var(--border-color);
-}
-.pass-criterion-requirement {
-    margin-bottom: 0.75rem;
-    color: var(--text-color);
-    font-size: 1rem;
-    line-height: 1.6;
-}
-.pass-criterion-status { /* Visar status för ett enskilt passCriterion */
-    font-size: 0.9rem;
-    color: var(--text-color-muted);
-    margin-bottom: 0.75rem;
-    font-style: italic;
-}
+/* .check-item { ... } BORTTAGEN */
+/* [data-theme="dark"] .check-item { ... } BORTTAGEN */
+/* .check-condition-title { ... } BORTTAGEN */
+/* .check-status-display { ... } BORTTAGEN */
+/* [data-theme="dark"] .check-status-display { ... } BORTTAGEN */
+/* .pass-criteria-list { ... } BORTTAGEN */
+/* .pass-criterion-item { ... } BORTTAGEN */
+/* [data-theme="dark"] .pass-criterion-item { ... } BORTTAGEN */
+/* .pass-criterion-requirement { ... } BORTTAGEN */
+/* .pass-criterion-status { ... } BORTTAGEN */
+/* .condition-actions, .pass-criterion-actions { ... } BORTTAGEN */
+/* .condition-actions { ... } BORTTAGEN */
+/* .condition-actions .button.button-small, .pass-criterion-actions .button.button-small { ... } BORTTAGEN */
+/* .condition-actions .button.button-small.active, .pass-criterion-actions .button.button-small.active { ... } BORTTAGEN */
+/* [data-theme="dark"] .condition-actions .button.button-small.active, [data-theme="dark"] .pass-criterion-actions .button.button-small.active { ... } BORTTAGEN */
 
-/* --- STYLING FÖR AKTIONSKNAPPAR (BÅDE CONDITION OCH PASS-CRITERION) --- */
-.condition-actions,
-.pass-criterion-actions {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    margin-top: 0.5rem;
-}
-.condition-actions {
-    margin-bottom: 1rem; 
-}
-.condition-actions .button.button-small,
-.pass-criterion-actions .button.button-small {
-    transition: outline-color 0.15s ease-in-out, outline-offset 0.15s ease-in-out;
-    outline: 2px solid transparent;
-    outline-offset: 2px;
-}
-.condition-actions .button.button-small.active,
-.pass-criterion-actions .button.button-small.active {
-    outline-color: var(--primary-color);
-}
-[data-theme="dark"] .condition-actions .button.button-small.active,
-[data-theme="dark"] .pass-criterion-actions .button.button-small.active {
-    outline-color: var(--primary-color);
-}
-/* --- SLUT PÅ STYLING FÖR AKTIONSKNAPPAR --- */
 
-/* Status textfärger */
+/* Status textfärger - Dessa kan behövas för den övergripande statusen på kravet, så de får vara kvar (eller flyttas till style.css om mer globala) */
 .status-text.status-passed { color: var(--success-color); font-weight: bold; }
 .status-text.status-failed { color: var(--danger-color); font-weight: bold; }
 .status-text.status-partially_audited { color: var(--warning-color); font-weight: bold; }
@@ -221,15 +151,3 @@
     flex-wrap: wrap;
     align-items: center;
 }
-
-/* --- BORTTAGEN CSS FÖR INAKTIVERADE NAVIGERINGSKNAPPAR --- */
-/* Ingen specifik :disabled-stil behövs längre eftersom knapparna inte renderas om de inte är funktionella. */
-/* Hela blocket nedan kan tas bort: */
-/*
-.audit-navigation-buttons .nav-group-right .button.button-secondary:disabled { ... }
-.audit-navigation-buttons .nav-group-right .button.button-primary:disabled { ... }
-.audit-navigation-buttons .nav-group-right .button:disabled svg { ... }
-[data-theme="dark"] .audit-navigation-buttons .nav-group-right .button.button-secondary:disabled { ... }
-[data-theme="dark"] .audit-navigation-buttons .nav-group-right .button.button-primary:disabled { ... }
-*/
-/* --- SLUT PÅ BORTTAGEN CSS --- */
