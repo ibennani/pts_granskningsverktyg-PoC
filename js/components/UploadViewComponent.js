@@ -1,8 +1,10 @@
 // js/components/UploadViewComponent.js
 
-// NYTT: Importera de nya logikmodulerna
 import { RuleFileLoader } from '../logic/rule_file_loader.js';
 import { SavedAuditLoader } from '../logic/saved_audit_loader.js';
+
+// NYTT: Importera specifika hjälpfunktioner
+import { create_element, get_icon_svg, load_css } from '../../utils/helpers.js'; // Justerad sökväg
 
 const UploadViewComponent_internal = (function () {
     'use-strict';
@@ -17,85 +19,84 @@ const UploadViewComponent_internal = (function () {
     let load_ongoing_audit_btn;
     let start_new_audit_btn;
 
-    // Dessa kommer fortfarande att behövas för att skickas vidare till logikmodulerna
     let local_getState;
     let local_dispatch;
     let local_StoreActionTypes;
 
-    // Beroenden som används direkt av denna komponent
-    let Translation_t_local; // Omdöpt för att undvika konflikt med tFunction i logikmodulerna
-    let Helpers_create_element_local;
-    let Helpers_get_icon_svg_local;
-    let Helpers_load_css_local;
+    // Beroenden som används direkt av denna komponent (importeras eller hämtas från window)
+    let Translation_t_local;
+    // Helpers_create_element_local, Helpers_get_icon_svg_local, Helpers_load_css_local tas bort, använder importerade
     let NotificationComponent_show_global_message_local;
     let NotificationComponent_get_global_message_element_reference_local;
-    let ValidationLogic_local; // Referens till hela ValidationLogic-objektet
+    let ValidationLogic_local;
 
     function get_t_func_local_scope() {
         if (Translation_t_local) return Translation_t_local;
-        return (typeof window.Translation !== 'undefined' && typeof window.Translation.t === 'function')
-            ? window.Translation.t
-            : (key, replacements) => {
-                let str = `**${key}**`;
-                if (replacements) {
-                    for (const rKey in replacements) {
-                        str += ` (${rKey}: ${replacements[rKey]})`;
-                    }
+        // Försök hämta från window.Translation om det finns (för bakåtkompatibilitet/övergång)
+        if (window.Translation && typeof window.Translation.t === 'function') {
+            Translation_t_local = window.Translation.t;
+            return Translation_t_local;
+        }
+        // Fallback om inget annat fungerar
+        return (key, replacements) => {
+            let str = `**${key}**`;
+            if (replacements) {
+                for (const rKey in replacements) {
+                    str += ` (${rKey}: ${replacements[rKey]})`;
                 }
-                return str + " (UploadView t not found)";
-            };
+            }
+            return str + " (UploadView t not found)";
+        };
     }
 
-    // NYTT: Modifierad funktion för att hantera val av regelfil
     function handle_rule_file_select(event) {
         const t = get_t_func_local_scope();
         const file = event.target.files[0];
         if (file) {
             RuleFileLoader.loadAndProcessRuleFile(
                 file,
-                ValidationLogic_local, // Skicka med ValidationLogic-objektet
+                ValidationLogic_local,
                 local_dispatch,
                 local_StoreActionTypes.INITIALIZE_NEW_AUDIT,
-                t, // Skicka med översättningsfunktionen
-                NotificationComponent_show_global_message_local, // Skicka med notisfunktionen
-                () => { // successCallback
-                    // NotificationComponent_show_global_message_local(t('rule_file_loaded_successfully'), 'success'); // Detta sköts nu inuti RuleFileLoader
+                t,
+                NotificationComponent_show_global_message_local,
+                () => {
                     router_ref('metadata');
                 },
-                (errorMessage) => { // errorCallback
-                    NotificationComponent_show_global_message_local(errorMessage, 'error');
+                (errorMessage) => {
+                    if (NotificationComponent_show_global_message_local) { // Säkerhetskoll
+                        NotificationComponent_show_global_message_local(errorMessage, 'error');
+                    }
                     if (rule_file_input_element) rule_file_input_element.value = '';
                 }
             );
         }
-        // Nollställ alltid input för att tillåta val av samma fil igen
         if (rule_file_input_element) rule_file_input_element.value = '';
     }
 
-    // NYTT: Modifierad funktion för att hantera val av sparad granskningsfil
     function handle_saved_audit_file_select(event) {
         const t = get_t_func_local_scope();
         const file = event.target.files[0];
         if (file) {
             SavedAuditLoader.loadAndProcessSavedAudit(
                 file,
-                ValidationLogic_local, // Skicka med ValidationLogic-objektet
+                ValidationLogic_local,
                 local_dispatch,
                 local_StoreActionTypes.LOAD_AUDIT_FROM_FILE,
-                local_getState, // Skicka med getState för att hämta app-version
-                t, // Skicka med översättningsfunktionen
-                NotificationComponent_show_global_message_local, // Skicka med notisfunktionen
-                () => { // successCallback
-                    // NotificationComponent_show_global_message_local(t('saved_audit_loaded_successfully'), 'success'); // Detta sköts nu inuti SavedAuditLoader
+                local_getState,
+                t,
+                NotificationComponent_show_global_message_local,
+                () => {
                     router_ref('audit_overview');
                 },
-                (errorMessage) => { // errorCallback
-                    NotificationComponent_show_global_message_local(errorMessage, 'error');
+                (errorMessage) => {
+                    if (NotificationComponent_show_global_message_local) { // Säkerhetskoll
+                        NotificationComponent_show_global_message_local(errorMessage, 'error');
+                    }
                     if (saved_audit_input_element) saved_audit_input_element.value = '';
                 }
             );
         }
-        // Nollställ alltid input
         if (saved_audit_input_element) saved_audit_input_element.value = '';
     }
 
@@ -109,11 +110,9 @@ const UploadViewComponent_internal = (function () {
 
         // Tilldela lokala referenser till globala funktioner/moduler
         if (window.Translation && typeof window.Translation.t === 'function') Translation_t_local = window.Translation.t;
-        if (window.Helpers) {
-            Helpers_create_element_local = window.Helpers.create_element;
-            Helpers_get_icon_svg_local = window.Helpers.get_icon_svg;
-            Helpers_load_css_local = window.Helpers.load_css;
-        }
+        
+        // Helpers funktioner importeras nu direkt, så ingen window.Helpers behövs här för dem.
+
         if (window.NotificationComponent) {
             NotificationComponent_show_global_message_local = window.NotificationComponent.show_global_message;
             NotificationComponent_get_global_message_element_reference_local = window.NotificationComponent.get_global_message_element_reference;
@@ -135,21 +134,25 @@ const UploadViewComponent_internal = (function () {
             global_message_element_ref = NotificationComponent_get_global_message_element_reference_local();
         }
 
-        if (Helpers_load_css_local) {
+        // Använd importerad load_css
+        if (typeof load_css === 'function') {
             try {
                 const link_tag = document.querySelector(`link[href="${CSS_PATH}"]`);
                 if (!link_tag) {
-                    await Helpers_load_css_local(CSS_PATH);
+                    await load_css(CSS_PATH);
                 }
             } catch (error) {
                 console.warn(`Failed to load CSS for UploadViewComponent: ${CSS_PATH}`, error);
             }
+        } else {
+            console.warn("[UploadViewComponent] load_css (importerad) not available.");
         }
     }
 
     function render() {
-        if (!app_container_ref || !Helpers_create_element_local) {
-            console.error("[UploadViewComponent] app_container_ref or Helpers_create_element_local is MISSING in render!");
+        // Använd importerade create_element och get_icon_svg
+        if (!app_container_ref || typeof create_element !== 'function') {
+            console.error("[UploadViewComponent] app_container_ref or create_element (importerad) is MISSING in render!");
             if (app_container_ref) app_container_ref.innerHTML = "<p>Error rendering Upload View.</p>";
             return;
         }
@@ -160,31 +163,32 @@ const UploadViewComponent_internal = (function () {
             app_container_ref.appendChild(global_message_element_ref);
         }
 
-        const title = Helpers_create_element_local('h1', { text_content: t('app_title') });
-        const intro_text = Helpers_create_element_local('p', { text_content: t('upload_view_intro') });
+        const title = create_element('h1', { text_content: t('app_title') });
+        const intro_text = create_element('p', { text_content: t('upload_view_intro') });
 
-        load_ongoing_audit_btn = Helpers_create_element_local('button', {
+        const load_icon_svg = typeof get_icon_svg === 'function' ? get_icon_svg('upload_file', ['currentColor'], 18) : '';
+        load_ongoing_audit_btn = create_element('button', {
             id: 'load-ongoing-audit-btn',
             class_name: 'button button-secondary',
-            html_content: `<span>${t('upload_ongoing_audit')}</span>` + (Helpers_get_icon_svg_local ? Helpers_get_icon_svg_local('upload_file', ['currentColor'], 18) : '')
+            html_content: `<span>${t('upload_ongoing_audit')}</span>` + load_icon_svg
         });
 
-        start_new_audit_btn = Helpers_create_element_local('button', {
+        start_new_audit_btn = create_element('button', {
             id: 'start-new-audit-btn',
             class_name: 'button button-primary',
-            html_content: `<span>${t('start_new_audit')}</span>` + (Helpers_get_icon_svg_local ? Helpers_get_icon_svg_local('upload_file', ['currentColor'], 18) : '')
+            html_content: `<span>${t('start_new_audit')}</span>` + load_icon_svg
         });
 
-        const button_group = Helpers_create_element_local('div', { class_name: 'button-group' });
+        const button_group = create_element('div', { class_name: 'button-group' });
         button_group.appendChild(load_ongoing_audit_btn);
         button_group.appendChild(start_new_audit_btn);
 
-        rule_file_input_element = Helpers_create_element_local('input', {
+        rule_file_input_element = create_element('input', {
             id: 'rule-file-input',
             attributes: {type: 'file', accept: '.json', style: 'display: none;', 'aria-hidden': 'true'}
         });
 
-        saved_audit_input_element = Helpers_create_element_local('input', {
+        saved_audit_input_element = create_element('input', {
             id: 'saved-audit-input',
             attributes: {type: 'file', accept: '.json', style: 'display: none;', 'aria-hidden': 'true'}
         });
@@ -206,7 +210,6 @@ const UploadViewComponent_internal = (function () {
         if (rule_file_input_element) rule_file_input_element.removeEventListener('change', handle_rule_file_select);
         if (saved_audit_input_element) saved_audit_input_element.removeEventListener('change', handle_saved_audit_file_select);
         
-        // Nollställ referenser till DOM-element och callbacks om de inte behövs längre
         rule_file_input_element = null;
         saved_audit_input_element = null;
         load_ongoing_audit_btn = null;
@@ -218,9 +221,6 @@ const UploadViewComponent_internal = (function () {
         local_dispatch = null;
         local_StoreActionTypes = null;
         Translation_t_local = null;
-        Helpers_create_element_local = null;
-        Helpers_get_icon_svg_local = null;
-        Helpers_load_css_local = null;
         NotificationComponent_show_global_message_local = null;
         NotificationComponent_get_global_message_element_reference_local = null;
         ValidationLogic_local = null;

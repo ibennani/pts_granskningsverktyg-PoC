@@ -11,7 +11,7 @@ import { RequirementAuditComponent } from './components/RequirementAuditComponen
 // Importera från den nya storen
 import { getState, dispatch, subscribe, StoreActionTypes, StoreInitialState } from './state.js';
 
-// NYTT: Importera funktioner från den refaktorerade translation_logic.js
+// Importera funktioner från den refaktorerade translation_logic.js
 import {
     t as imported_t,
     set_language as imported_set_language,
@@ -20,8 +20,16 @@ import {
     ensure_initial_load as imported_ensure_initial_load
 } from './translation_logic.js';
 
+// NYTT: Importera specifika hjälpfunktioner
+import {
+    create_element,
+    get_icon_svg,
+    escape_html // escape_html används i render_view felhantering
+    // Lägg till fler här om de direkt används av main.js
+} from '../utils/helpers.js';
 
-(function () { // Behåll IIFE för main.js för att undvika att dess interna variabler blir globala
+
+(function () { // Behåll IIFE för main.js
     'use-strict';
 
     const app_container = document.getElementById('app-container');
@@ -40,83 +48,79 @@ import {
     let language_label_element = null;
     let store_unsubscribe_function = null;
 
-    // NYTT: Strategi B - Gör de importerade översättningsfunktionerna tillgängliga globalt
-    // för bakåtkompatibilitet med komponenter som fortfarande använder window.Translation.
-    // Detta kan tas bort gradvis när komponenterna uppdateras.
+    // Strategi B - Gör de importerade översättningsfunktionerna tillgängliga globalt
     window.Translation = {
         t: imported_t,
         set_language: imported_set_language,
         get_current_language_code: imported_get_current_language_code,
         get_supported_languages: imported_get_supported_languages,
         ensure_initial_load: imported_ensure_initial_load
-        // Lägg till andra funktioner från translation_logic.js här om de används globalt
     };
-    // Nu kan get_t_fallback och andra delar av main.js som förväntar sig window.Translation.t
-    // fortfarande fungera, men vi kommer att försöka använda de importerade direkt där det är möjligt.
-    const t = imported_t; // Använd den importerade t-funktionen direkt i main.js
+    const t = imported_t; // Lokal genväg till importerad t
 
 
     function update_app_chrome_texts() {
-        if (!window.Helpers || typeof window.Helpers.get_icon_svg !== 'function') { // Helpers behövs för ikon i temaknapp
-             console.warn("[Main.js] update_app_chrome_texts: Helpers.get_icon_svg is not available.");
-             // Fortsätt utan att uppdatera ikonen om Helpers saknas
+        // get_icon_svg importeras nu direkt
+        if (typeof get_icon_svg !== 'function') {
+             console.warn("[Main.js] update_app_chrome_texts: get_icon_svg (importerad) is not available.");
         }
-        document.title = t('app_title'); // Använder nu den importerade/lokala t
+        document.title = t('app_title');
         if (theme_toggle_button_element && theme_toggle_button_element.themeFunctions &&
             typeof theme_toggle_button_element.themeFunctions.updateContent === 'function') {
             const current_theme = document.documentElement.getAttribute('data-theme') || 'light';
             theme_toggle_button_element.themeFunctions.updateContent(current_theme);
         }
         if (language_selector_element) {
-            const supported_languages = imported_get_supported_languages(); // Använder importerad funktion
+            const supported_languages = imported_get_supported_languages();
             Array.from(language_selector_element.options).forEach(option => {
                 if (supported_languages[option.value]) {
                     option.textContent = supported_languages[option.value];
                 }
             });
-            language_selector_element.value = imported_get_current_language_code(); // Använder importerad funktion
+            language_selector_element.value = imported_get_current_language_code();
             if(language_label_element) language_label_element.textContent = t('language_switcher_label');
         }
     }
 
     function init_ui_controls() {
-        if (!window.Helpers || typeof window.Helpers.create_element !== 'function') {
-            console.error("[Main.js] init_ui_controls: Helpers.create_element not available!");
+        // create_element importeras nu direkt
+        if (typeof create_element !== 'function') {
+            console.error("[Main.js] init_ui_controls: create_element (importerad) not available!");
             return;
         }
-        const controls_wrapper = Helpers.create_element('div', { class_name: 'global-controls'});
+        const controls_wrapper = create_element('div', { class_name: 'global-controls'});
 
-        const language_selector_container = Helpers.create_element('div', { class_name: 'language-selector-container' });
-        language_label_element = Helpers.create_element('label', {
+        const language_selector_container = create_element('div', { class_name: 'language-selector-container' });
+        language_label_element = create_element('label', {
             attributes: {for: 'language-selector'},
-            text_content: t('language_switcher_label'), // Använder lokal/importerad t
+            text_content: t('language_switcher_label'),
             class_name: 'visually-hidden'
         });
         language_selector_container.appendChild(language_label_element);
-        language_selector_element = Helpers.create_element('select', {
+        language_selector_element = create_element('select', {
             id: 'language-selector',
             class_name: ['form-control', 'form-control-small']
         });
-        
-        const supported_languages = imported_get_supported_languages(); // Använder importerad
+
+        const supported_languages = imported_get_supported_languages();
         for (const lang_code in supported_languages) {
-            const option = Helpers.create_element('option', { value: lang_code, text_content: supported_languages[lang_code] });
+            const option = create_element('option', { value: lang_code, text_content: supported_languages[lang_code] });
             language_selector_element.appendChild(option);
         }
-        language_selector_element.value = imported_get_current_language_code(); // Använder importerad
+        language_selector_element.value = imported_get_current_language_code();
         language_selector_element.addEventListener('change', async (event) => {
             if (window.NotificationComponent && typeof window.NotificationComponent.clear_global_message === 'function') NotificationComponent.clear_global_message();
             const selected_lang_code = event.target.value;
-            await imported_set_language(selected_lang_code); // Använder importerad
-            // 'languageChanged'-eventet kommer fortfarande att skickas från translation_logic.js
+            await imported_set_language(selected_lang_code);
         });
         language_selector_container.appendChild(language_selector_element);
         controls_wrapper.appendChild(language_selector_container);
 
-        theme_toggle_button_element = Helpers.create_element('button', { id: 'theme-toggle', class_name: ['button', 'button-default'] });
+        theme_toggle_button_element = create_element('button', { id: 'theme-toggle', class_name: ['button', 'button-default'] });
 
         function set_theme_button_content(theme) {
-            if (!theme_toggle_button_element || !window.Helpers || !window.Helpers.get_icon_svg) return;
+            // get_icon_svg importeras nu direkt
+            if (!theme_toggle_button_element || typeof get_icon_svg !== 'function') return;
             let icon_svg_string;
             let button_label_text;
             let icon_color_val = getComputedStyle(document.documentElement).getPropertyValue('--button-default-text').trim();
@@ -124,11 +128,11 @@ import {
                 icon_color_val = (theme === 'dark') ? 'var(--text-color)' : 'var(--text-color)';
             }
             if (theme === 'dark') {
-                icon_svg_string = Helpers.get_icon_svg('light_mode', [icon_color_val], 18);
-                button_label_text = t('light_mode'); // Använder lokal/importerad t
+                icon_svg_string = get_icon_svg('light_mode', [icon_color_val], 18);
+                button_label_text = t('light_mode');
             } else {
-                icon_svg_string = Helpers.get_icon_svg('dark_mode', [icon_color_val], 18);
-                button_label_text = t('dark_mode'); // Använder lokal/importerad t
+                icon_svg_string = get_icon_svg('dark_mode', [icon_color_val], 18);
+                button_label_text = t('dark_mode');
             }
             theme_toggle_button_element.innerHTML = `<span> ${button_label_text}</span>` + (icon_svg_string || '');
         }
@@ -166,8 +170,9 @@ import {
     }
 
     async function render_view(view_name_to_render, params_to_render = {}) {
-        if (!window.Helpers || typeof window.Helpers.escape_html !== 'function') {
-            console.error("[Main.js] render_view: Helpers.escape_html missing!");
+        // escape_html importeras nu direkt
+        if (typeof escape_html !== 'function') {
+            console.error("[Main.js] render_view: escape_html (importerad) missing!");
             if(app_container) app_container.innerHTML = `<p>Critical system error during view render.</p>`;
             return;
         }
@@ -190,7 +195,7 @@ import {
             case 'requirement_audit': ComponentClass = RequirementAuditComponent; break;
             default:
                 console.error(`[Main.js] View "${view_name_to_render}" not found in render_view switch.`);
-                app_container.innerHTML = `<p>${t("error_view_not_found", {viewName: Helpers.escape_html(view_name_to_render)})}</p>`;
+                app_container.innerHTML = `<p>${t("error_view_not_found", {viewName: escape_html(view_name_to_render)})}</p>`;
                 return;
         }
 
@@ -198,7 +203,7 @@ import {
             current_view_component_instance = ComponentClass;
             if (!current_view_component_instance || typeof current_view_component_instance.init !== 'function' || typeof current_view_component_instance.render !== 'function') {
                 console.error(`[Main.js] Component for view ${view_name_to_render} is UNDEFINED or not a valid component object.`);
-                app_container.innerHTML = `<p>${t("error_component_load", {viewName: Helpers.escape_html(view_name_to_render)})}</p>`;
+                app_container.innerHTML = `<p>${t("error_component_load", {viewName: escape_html(view_name_to_render)})}</p>`;
                 return;
             }
             await current_view_component_instance.init(
@@ -215,7 +220,7 @@ import {
             }
         } catch (error) {
             console.error(`[Main.js] CATCH BLOCK: Error during view ${view_name_to_render} lifecycle:`, error);
-            if(app_container) app_container.innerHTML = `<p>${t("error_loading_view", {viewName: Helpers.escape_html(view_name_to_render), errorMessage: error.message})}</p>`;
+            if(app_container) app_container.innerHTML = `<p>${t("error_loading_view", {viewName: escape_html(view_name_to_render), errorMessage: error.message})}</p>`;
             if (window.NotificationComponent && typeof window.NotificationComponent.show_global_message === 'function') {
                 NotificationComponent.show_global_message(t("error_loading_view_details", {viewName: view_name_to_render}), 'error');
             }
@@ -267,7 +272,6 @@ import {
     }
 
     async function init_app() {
-        // Använd den importerade ensure_initial_load
         if (typeof imported_ensure_initial_load === 'function') {
             await imported_ensure_initial_load();
         } else {
@@ -275,7 +279,7 @@ import {
             if(app_container) app_container.innerHTML = `<p>${t('critical_error_language_system_init_failed')}</p>`;
             return;
         }
-        document.title = t('app_title'); // Använder nu den lokala/importerade t
+        document.title = t('app_title');
 
         if (window.NotificationComponent && typeof window.NotificationComponent.init === 'function') {
             await NotificationComponent.init();
@@ -302,4 +306,4 @@ import {
         init_app().catch(err => console.error("Error during app initialization (direct call):", err));
     }
 
-})(); // IIFE för main.js avslutas
+})();

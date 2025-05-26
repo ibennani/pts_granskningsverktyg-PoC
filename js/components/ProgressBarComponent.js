@@ -1,15 +1,20 @@
 // js/components/ProgressBarComponent.js
+
+// NYTT: Importera create_element och load_css från helpers.js
+import { create_element, load_css } from '../../utils/helpers.js'; // Justerad sökväg
+
 (function () { // IIFE start
     'use-strict';
 
     const CSS_PATH = 'css/components/progress_bar_component.css';
     let css_loaded = false;
 
-    async function load_styles_if_needed() {
-        if (!css_loaded && typeof window.Helpers !== 'undefined' && typeof window.Helpers.load_css === 'function') {
+    async function load_styles_if_needed_internal() { // Omdöpt för att vara intern
+        // Använd importerad load_css
+        if (!css_loaded && typeof load_css === 'function') {
             if (!document.querySelector(`link[href="${CSS_PATH}"]`)) {
                 try {
-                    await window.Helpers.load_css(CSS_PATH);
+                    await load_css(CSS_PATH);
                     css_loaded = true;
                 } catch (error) {
                     console.warn("Failed to load CSS for ProgressBarComponent:", error);
@@ -17,25 +22,25 @@
             } else {
                 css_loaded = true; // Already in DOM
             }
-        } else if (!css_loaded) { // Fallback if Helpers.load_css is not available but css_loaded is false
-            console.warn("ProgressBarComponent: Helpers.load_css not available or CSS already loaded state unknown.");
+        } else if (!css_loaded) {
+            console.warn("ProgressBarComponent: load_css (importerad) not available or CSS already loaded state unknown.");
         }
     }
 
-    function create(current_value, max_value, options = {}) {
-        load_styles_if_needed(); // Fire and forget CSS loading
+    function create_progress_bar(current_value, max_value, options = {}) { // Omdöpt för att vara intern
+        load_styles_if_needed_internal(); // Anropa den interna omdöpta funktionen
 
-        if (typeof window.Helpers === 'undefined' || typeof window.Helpers.create_element !== 'function') {
-            console.error("ProgressBarComponent: Helpers.create_element not available!");
-            const fallback_progress = document.createElement('div');
+        // Använd importerad create_element
+        if (typeof create_element !== 'function') {
+            console.error("ProgressBarComponent: create_element (importerad) not available!");
+            const fallback_progress = document.createElement('div'); // Enkel fallback
             fallback_progress.textContent = `Progress: ${current_value} / ${max_value}`;
             return fallback_progress;
         }
 
-        const { create_element } = window.Helpers;
         const t = (typeof window.Translation !== 'undefined' && typeof window.Translation.t === 'function')
             ? window.Translation.t
-            : (key, rep) => (rep && rep.defaultValue ? rep.defaultValue : key);
+            : (key, rep) => (rep && rep.defaultValue ? rep.defaultValue : `**${key}** (PB t not found)`);
 
         const progress_wrapper = create_element('div', { class_name: 'progress-bar-wrapper' });
 
@@ -47,17 +52,15 @@
         if (options.id) {
             progress_element_attributes.id = options.id;
         }
-        // Set aria-valuemin, aria-valuemax, aria-valuenow for better accessibility with the native progress element
         progress_element_attributes['aria-valuemin'] = "0";
         progress_element_attributes['aria-valuemax'] = String(max_value);
         progress_element_attributes['aria-valuenow'] = String(current_value);
-
 
         const progress_element = create_element('progress', {
             class_name: 'progress-bar-element',
             attributes: progress_element_attributes
         });
-        
+
         progress_wrapper.appendChild(progress_element);
 
         if (options.show_text || options.show_percentage) {
@@ -72,24 +75,22 @@
                 class_name: 'progress-bar-text',
                 text_content: text_content_val
             });
-            if (options.text_sr_only) {
+            if (options.text_sr_only) { // Antag att 'visually-hidden' klassen finns globalt
                 progress_text.classList.add('visually-hidden');
             }
             progress_wrapper.appendChild(progress_text);
         }
 
-
         return progress_wrapper;
     }
-    
+
     const public_api = {
-        create
+        create: create_progress_bar // Exponera den omdöpta interna funktionen som 'create'
     };
 
-    // Expose the component to the global scope
     if (typeof window.ProgressBarComponent === 'undefined') {
         window.ProgressBarComponent = public_api;
-    } else { // If re-running script for some reason, ensure it's updated.
+    } else {
         window.ProgressBarComponent = public_api;
     }
 
