@@ -1,141 +1,121 @@
 // js/components/NotificationComponent.js
 
-// NYTT: Importera create_element och load_css från helpers.js
-// Vi antar att helpers.js ligger en nivå upp från components-mappen.
-import { create_element, load_css } from '../../utils/helpers.js';
+// KORRIGERAD SÖKVÄG till helpers.js
+import { create_element, load_css } from '../utils/helpers.js';
 
-(function () { // IIFE start
-    'use-strict';
+// KORRIGERAD SÖKVÄG till translation_logic.js
+import { t as imported_t_notification } from '../translation_logic.js';
 
-    const CSS_PATH = 'css/components/notification_component.css';
-    const GLOBAL_MESSAGE_CONTAINER_ID = 'global-message-area';
+const CSS_PATH = 'css/components/notification_component.css'; // Relativt till index.html
+const GLOBAL_MESSAGE_CONTAINER_ID = 'global-message-area';
 
-    let global_message_element = null;
-    // Translation.t kommer fortfarande att hämtas från window inuti funktionerna vid behov,
-    // eftersom denna komponent inte initieras av main.js på samma sätt som vyer
-    // och därmed inte lätt kan få t() inskickad. Detta kan refaktoreras senare.
+let global_message_element = null;
+let css_loaded_for_notification = false;
 
-    async function init_notification_component() { // Omdöpt för att undvika global namnkonflikt
-        // Använd importerad load_css
-        if (typeof load_css === 'function') {
+async function load_nc_styles_if_needed() {
+    if (!css_loaded_for_notification && typeof load_css === 'function') {
+        if (!document.querySelector(`link[href="${CSS_PATH}"]`)) {
             try {
-                const link_tag = document.querySelector(`link[href="${CSS_PATH}"]`);
-                if(!link_tag) await load_css(CSS_PATH);
+                await load_css(CSS_PATH);
+                css_loaded_for_notification = true;
             } catch (error) {
-                console.error("NotificationComponent: Failed to load CSS:", error);
+                console.error("NotificationComponentMod: Failed to load CSS:", error);
             }
         } else {
-            console.warn("NotificationComponent: load_css (importerad) not available for CSS loading.");
+            css_loaded_for_notification = true;
         }
-
-        return Promise.resolve().then(() => {
-            global_message_element = document.getElementById(GLOBAL_MESSAGE_CONTAINER_ID);
-            // Använd importerad create_element
-            if (!global_message_element && typeof create_element === 'function') {
-                global_message_element = create_element('div', {
-                    id: GLOBAL_MESSAGE_CONTAINER_ID,
-                    attributes: { 'aria-live': 'polite', hidden: 'true' }
-                });
-                // Denna kommer att läggas till av vyn som använder den.
-            } else if (!global_message_element) { // Fallback om create_element inte kunde importeras
-                console.error("NotificationComponent: create_element (importerad) not available to create message container.");
-                global_message_element = document.createElement('div'); // Mycket enkel fallback
-                global_message_element.id = GLOBAL_MESSAGE_CONTAINER_ID;
-                global_message_element.setAttribute('aria-live', 'polite');
-                global_message_element.hidden = true;
-            }
-        });
+    } else if (!css_loaded_for_notification && typeof load_css !== 'function') {
+        console.warn("NotificationComponentMod: load_css (importerad) not available.");
     }
+}
 
-    function _update_global_message_content(message, type){
-        if (!global_message_element || typeof create_element !== 'function') { // Kolla importerad create_element
-            console.error("NotificationComponent: Cannot update message, core dependencies missing or element not ready.");
-            return;
-        }
-        // Hämta t-funktionen från window här, då den inte skickas in.
-        const t = (typeof window.Translation !== 'undefined' && typeof window.Translation.t === 'function')
-            ? window.Translation.t
-            : (key, rep) => (rep && rep.defaultValue ? rep.defaultValue : `**${key}** (NC t not found)`);
-
-
-        global_message_element.innerHTML = '';
-
-        if (message && message.trim() !== '') {
-            global_message_element.textContent = message;
-            global_message_element.className = ''; // Rensa tidigare klasser
-            global_message_element.classList.add('global-message-content'); // Behåll denna
-            global_message_element.classList.add(`message-${type}`);
-
-            if (type === 'error' || type === 'warning') {
-                const close_button = create_element('button', { // Använd importerad
-                    class_name: 'global-message-close-btn', html_content: '×',
-                    attributes: { 'aria-label': t('close'), title: t('close') }
-                });
-                close_button.addEventListener('click', clear_global_message, { once: true });
-                global_message_element.appendChild(close_button);
-                global_message_element.setAttribute('role', 'alert');
-            } else {
-                global_message_element.removeAttribute('role');
-            }
-            global_message_element.removeAttribute('hidden');
-        } else {
-            clear_global_message(); // Detta anropar funktionen nedan
-        }
-    }
-
-    function show_global_message(message, type = 'info') {
-        if (!global_message_element) {
-            init_notification_component().then(() => {
-                if(global_message_element) _update_global_message_content(message, type);
-                else console.error("NotificationComponent: Still cannot show message, container not established after re-init.");
+export async function init_notification_module() {
+    await load_nc_styles_if_needed();
+    if (!global_message_element) {
+        global_message_element = document.getElementById(GLOBAL_MESSAGE_CONTAINER_ID);
+        if (!global_message_element && typeof create_element === 'function') {
+            global_message_element = create_element('div', {
+                id: GLOBAL_MESSAGE_CONTAINER_ID,
+                attributes: { 'aria-live': 'polite', hidden: 'true' }
             });
-            return;
+        } else if (!global_message_element) {
+            console.error("NotificationComponentMod init: create_element not available to create message container if not found.");
         }
-        _update_global_message_content(message, type);
     }
+}
 
-    function clear_global_message() {
-        if (global_message_element) {
-            global_message_element.textContent = '';
-            global_message_element.setAttribute('hidden', 'true');
-            global_message_element.className = 'global-message-content'; // Återställ till basklass
+function _update_global_message_content_internal(message, type) {
+    if (!global_message_element || typeof create_element !== 'function' || typeof imported_t_notification !== 'function') {
+        console.error("NotificationComponentMod: Cannot update message, core dependencies missing or element not ready.");
+        return;
+    }
+    global_message_element.innerHTML = '';
+
+    if (message && message.trim() !== '') {
+        global_message_element.textContent = message;
+        global_message_element.className = '';
+        global_message_element.classList.add('global-message-content');
+        global_message_element.classList.add(`message-${type}`);
+
+        if (type === 'error' || type === 'warning') {
+            const close_button = create_element('button', {
+                class_name: 'global-message-close-btn', html_content: '×',
+                attributes: { 'aria-label': imported_t_notification('close'), title: imported_t_notification('close') }
+            });
+            close_button.addEventListener('click', clear_global_message, { once: true });
+            global_message_element.appendChild(close_button);
+            global_message_element.setAttribute('role', 'alert');
+        } else {
             global_message_element.removeAttribute('role');
-            const btn = global_message_element.querySelector('.global-message-close-btn');
-            if(btn) btn.remove();
+        }
+        global_message_element.removeAttribute('hidden');
+    } else {
+        clear_global_message();
+    }
+}
+
+export function show_global_message(message, type = 'info') {
+    if (!global_message_element) {
+        init_notification_module().then(() => {
+             if(global_message_element) _update_global_message_content_internal(message, type);
+             else console.error("NotificationComponentMod: Still cannot show message, container not established after init.");
+        }).catch(err => {
+            console.error("Error during init in show_global_message for NotificationComponent:", err);
+        });
+        return;
+    }
+    _update_global_message_content_internal(message, type);
+}
+
+export function clear_global_message() {
+    if (global_message_element) {
+        global_message_element.textContent = '';
+        global_message_element.setAttribute('hidden', 'true');
+        global_message_element.className = 'global-message-content';
+        global_message_element.removeAttribute('role');
+        const btn = global_message_element.querySelector('.global-message-close-btn');
+        if(btn) btn.remove();
+    }
+}
+
+export function get_global_message_element_reference() {
+    if (!global_message_element) {
+        if (typeof create_element === 'function' && !document.getElementById(GLOBAL_MESSAGE_CONTAINER_ID)) {
+             global_message_element = create_element('div', {
+                id: GLOBAL_MESSAGE_CONTAINER_ID,
+                attributes: { 'aria-live': 'polite', hidden: 'true' }
+            });
+        } else if (!document.getElementById(GLOBAL_MESSAGE_CONTAINER_ID) && typeof create_element !== 'function') {
+            // Fallback om create_element inte finns och elementet inte finns
+            global_message_element = document.createElement('div');
+            global_message_element.id = GLOBAL_MESSAGE_CONTAINER_ID;
+            global_message_element.setAttribute('aria-live', 'polite');
+            global_message_element.hidden = true;
+        } else {
+             global_message_element = document.getElementById(GLOBAL_MESSAGE_CONTAINER_ID);
         }
     }
+    return global_message_element;
+}
 
-    function get_global_message_element_reference() {
-        if (!global_message_element) {
-            // Försök skapa om den inte finns (kan hända om en vy anropar detta innan main.js' init har kört fullt ut)
-            if (typeof create_element === 'function' && !document.getElementById(GLOBAL_MESSAGE_CONTAINER_ID)) {
-                 global_message_element = create_element('div', { // Använd importerad
-                    id: GLOBAL_MESSAGE_CONTAINER_ID,
-                    attributes: { 'aria-live': 'polite', hidden: 'true' }
-                });
-            } else if (!document.getElementById(GLOBAL_MESSAGE_CONTAINER_ID)) {
-                global_message_element = document.createElement('div');
-                global_message_element.id = GLOBAL_MESSAGE_CONTAINER_ID;
-                global_message_element.setAttribute('aria-live', 'polite');
-                global_message_element.hidden = true;
-            } else {
-                 global_message_element = document.getElementById(GLOBAL_MESSAGE_CONTAINER_ID);
-            }
-        }
-        return global_message_element;
-    }
-
-    const public_api = {
-        init: init_notification_component, // Exponera den omdöpta init
-        show_global_message,
-        clear_global_message,
-        get_global_message_element_reference
-    };
-
-    window.NotificationComponent = public_api;
-
-    // console.log("[NotificationComponent.js] IIFE executed. typeof window.NotificationComponent:", typeof window.NotificationComponent);
-    // if (typeof window.NotificationComponent === 'object' && window.NotificationComponent !== null) {
-    //     console.log("[NotificationComponent.js] window.NotificationComponent keys:", Object.keys(window.NotificationComponent));
-    // }
-})();
+console.log("[NotificationComponent.js] ES6 Module loaded.");

@@ -4,18 +4,15 @@
 export const RuleFileLoader = (function () {
     'use-strict';
 
-    // Beroenden kommer att skickas in till loadAndProcessRuleFile-funktionen.
-    // Detta gör modulen mer testbar och mindre beroende av globala objekt direkt.
-
     async function loadAndProcessRuleFile(
-        fileObject,                 // Filobjektet från <input type="file">
-        validationLogic,            // Referens till ValidationLogic-modulen (eller dess funktion)
-        dispatchFunction,           // Funktion för att skicka actions till store
-        storeActionTypeForInitialize, // Specifik action-typ för att initiera ny granskning
-        tFunction,                  // Översättningsfunktion
-        notificationFunction,       // Funktion för att visa meddelanden
-        successCallback,            // Callback som körs vid lyckad laddning och validering
-        errorCallback               // Callback som körs vid fel
+        fileObject,
+        validationLogic,            // Förväntas nu vara ett objekt, t.ex. { validate_rule_file_json: func }
+        dispatchFunction,
+        storeActionTypeForInitialize,
+        tFunction,
+        notificationFunction,
+        successCallback,
+        errorCallback
     ) {
         if (!fileObject) {
             if (errorCallback) errorCallback(tFunction('error_no_file_selected', { defaultValue: "No file selected."}));
@@ -32,6 +29,7 @@ export const RuleFileLoader = (function () {
         reader.onload = async function (e) {
             try {
                 const json_content = JSON.parse(e.target.result);
+                // ÄNDRAD: Anropa funktionen via det inskickade objektet
                 const validation_result = validationLogic.validate_rule_file_json(json_content);
 
                 if (validation_result.isValid) {

@@ -1,60 +1,40 @@
 // file: js/components/RequirementCardComponent.js
 
-// NYTT: Importera create_element och load_css (och add_protocol_if_missing)
-import { create_element, load_css, add_protocol_if_missing } from '../../utils/helpers.js'; // Justerad sökväg
+// KORRIGERAD SÖKVÄG till helpers.js
+import { create_element, load_css, add_protocol_if_missing } from '../utils/helpers.js';
+
+// KORRIGERAD SÖKVÄG till translation_logic.js
+import { t as imported_t_reqcard } from '../translation_logic.js';
 
 const RequirementCardComponent_internal = (function () {
     'use-strict';
 
-    const CSS_PATH = 'css/components/requirement_card_component.css';
+    const CSS_PATH = 'css/components/requirement_card_component.css'; // Relativt till index.html
     let css_loaded = false;
 
-    function get_t_func_local_scope() { // Omdöpt för tydlighet
-        // Fortsätter att hämta från window.Translation tills vidare
-        return (typeof window.Translation !== 'undefined' && typeof window.Translation.t === 'function')
-            ? window.Translation.t
-            : (key, replacements) => {
-                let str = replacements && replacements.defaultValue ? replacements.defaultValue : `**${key}**`;
-                if (replacements && !replacements.defaultValue) {
-                    for (const rKey in replacements) {
-                        str += ` (${rKey}: ${replacements[rKey]})`;
-                    }
-                }
-                return str + " (ReqCard t not found)";
-            };
-    }
-
-    async function load_styles_if_needed_internal() { // Omdöpt
-        // Använd importerad load_css
+    async function load_styles_if_needed_internal() {
         if (!css_loaded && typeof load_css === 'function') {
             if (!document.querySelector(`link[href="${CSS_PATH}"]`)) {
                 try {
                     await load_css(CSS_PATH);
                     css_loaded = true;
-                } catch (error) {
-                    console.warn("Failed to load CSS for RequirementCardComponent:", error);
-                }
-            } else {
-                css_loaded = true;
-            }
-        } else if (!css_loaded) {
-            // console.warn("RequirementCardComponent: load_css (importerad) not available or CSS already loaded state unknown.");
+                } catch (error) { console.warn("Failed to load CSS for RequirementCardComponent:", error); }
+            } else { css_loaded = true; }
+        } else if (!css_loaded && typeof load_css !== 'function') {
+            console.warn("RequirementCardComponent: load_css (importerad) not available.");
         }
     }
 
-    function create_card_element_internal(requirement, sample_id, requirement_status, router_cb) { // Omdöpt
-        load_styles_if_needed_internal();
+    async function create_card_element_internal(requirement, sample_id, requirement_status, router_cb) {
+        await load_styles_if_needed_internal();
 
-        const t = get_t_func_local_scope();
-        // Använd importerad create_element och add_protocol_if_missing
-        if (typeof create_element !== 'function') {
-            console.error("RequirementCardComponent: create_element (importerad) not available!");
-            const el = document.createElement('li'); // Enkel fallback
+        if (typeof create_element !== 'function' || typeof imported_t_reqcard !== 'function') {
+            console.error("RequirementCardComponent: create_element or t (importerad) not available!");
+            const el = document.createElement('li'); // Standard DOM API som fallback
             el.textContent = requirement.title || "Error creating card";
             return el;
         }
         const add_proto_func = typeof add_protocol_if_missing === 'function' ? add_protocol_if_missing : (url) => url;
-
 
         const card_li = create_element('li', { class_name: 'requirement-card' });
         const card_content_wrapper = create_element('div', { class_name: 'requirement-card-inner-content' });
@@ -70,13 +50,12 @@ const RequirementCardComponent_internal = (function () {
         const title_h_container = create_element('h3', { class_name: 'requirement-card-title-container'});
         const title_button = create_element('button', {
             class_name: 'requirement-card-title-button',
-            text_content: requirement.title
+            text_content: requirement.title,
+            // attributes: { 'aria-label': imported_t_reqcard('requirement_card_aria_label', { title: requirement.title, reference: requirement.standardReference?.text || '', statusText: imported_t_reqcard(`audit_status_${requirement_status}`) }) }
         });
         title_button.addEventListener('click', () => {
             if (router_cb && typeof router_cb === 'function') {
                 router_cb('requirement_audit', { sampleId: sample_id, requirementId: requirement.key || requirement.id });
-            } else {
-                // console.warn("RequirementCard: router_cb not provided or not a function for title navigation.");
             }
         });
         title_h_container.appendChild(title_button);
@@ -89,11 +68,7 @@ const RequirementCardComponent_internal = (function () {
                 reference_element = create_element('a', {
                     class_name: 'requirement-card-reference-link',
                     text_content: requirement.standardReference.text,
-                    attributes: {
-                        href: url_to_use,
-                        target: '_blank',
-                        rel: 'noopener noreferrer'
-                    }
+                    attributes: { href: url_to_use, target: '_blank', rel: 'noopener noreferrer' }
                 });
             } else {
                 reference_element = create_element('span', {
@@ -112,7 +87,7 @@ const RequirementCardComponent_internal = (function () {
     }
 
     const public_api = {
-        create: create_card_element_internal // Exponera den omdöpta interna funktionen som 'create'
+        create: create_card_element_internal
     };
 
     return public_api;
